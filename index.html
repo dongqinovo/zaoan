@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>៷>ᴗ&lt;៷</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    overflow: hidden;
+    background: #ffffff;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    transition: background .8s ease;
+  }
+  body.blackout { background: #000; }
+  body.night    { background: #04050a; }
+
+  /* ===== 背景：均匀斜向的淡粉色颜文字 ===== */
+  #bg {
+    position: fixed;
+    left: -50%; top: -50%;
+    width: 200%; height: 200%;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    transform: rotate(-30deg);
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity .8s ease;
+  }
+  #bg span {
+    width: 96px; height: 36px; line-height: 36px;
+    font-size: 13px;
+    text-align: center;
+    color: #ffd7e3;
+    white-space: nowrap;
+    user-select: none;
+  }
+  body.night #bg,
+  body.blackout #bg { opacity: 0; }
+
+  /* ===== 星夜 ===== */
+  #stars {
+    position: fixed; inset: 0;
+    z-index: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.2s ease;
+    background: radial-gradient(circle at 50% 30%, #1d2647 0%, #0a0d1 a 55%, #04050a 100%);
+  }
+  body.night #stars { opacity: 1; }
+  .star {
+    position50: absolute;
+    background: #fff;
+    border-radius:%;
+  }
+  @keyframes twinkle {
+    from { opacity: .12; }
+    to   { opacity: 1; }
+  }
+
+  /* ===== 舞台 ===== */
+  #stage {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  #mainBox, #choices {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #choices { gap: 10px; margin-top: 18px; }
+
+  /* ===== 字框 ===== */
+  .box {
+    background: #ffffff;
+    color: #1a1a1a;
+    border: 1px solid rgba(0, 0, 0, .05);
+    border-radius: 16px;
+    padding: 15px 32px;
+    font-size: clamp(16px, 2.2vw, 22px);
+    letter-spacing: .5px;
+    text-align: center;
+    white-space: nowrap;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .10), 0 2px 6px rgba(0, 0, 0, .05);
+    animation: pop .38s cubic-bezier(.2, .9, .3, 1.25) both;
+    user-select: none;
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(10px) scale(.9); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .box.small {
+    font-size: clamp(13px, 1.6vw, 16px);
+    padding: 10px 20px;
+    border-radius: 12px;
+    color: #333;
+  }
+
+  .box.clickable { cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }
+  .box.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, .15), 0 3px 8px rgba(0, 0, 0, .06);
+  }
+  .box.clickable:active { transform: translateY(0) scale(.98); }
+
+  /* 白色字体（黑底用） */
+  .box.dark {
+    background: transparent;
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, .22);
+    box-shadow: 0 10px 40px rgba(255, 255, 255, .07);
+  }
+
+  /* ===== 突脸大虫子 ===== */
+  .bugface {
+    position: fixed; inset: 0;
+    z-index: 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 70vmin;
+    line-height: 1;
+    pointer-events: none;
+    animation: bugIn .16s ease-out both;
+    text-shadow: 0 0 60px rgba(120, 255, 160, .35);
+  }
+  @keyframes bugIn {
+    from { opacity: 0; transform: scale(.2) rotate(-25deg); }
+    to   { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+</style>
+</head>
+<body>
+
+  <!-- 背景颜文字层 -->
+  <div id="bg"></div>
+  <!-- 星夜层 -->
+  <div id="stars"></div>
+
+  <!-- 舞台 -->
+  <div id="stage">
+    <div id="mainBox"></div>
+    <div id="choices"></div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ========== 工具 ========== */
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const $ = (id) => document.getElementById(id);
+
+  const mainBox = $("mainBox");
+  const choicesBox = $("choices");
+  let locked = false;
+
+  /* ========== 背景颜文字 ========== */
+  function buildBG() {
+    const bg = $("bg");
+    const cellW = 96, cellH = 36;
+    const cols = Math.ceil((window.innerWidth * 2) / cellW) + 3;
+    const rows = Math.ceil((window.innerHeight * 2) / cellH) + 3;
+    const frag = document.createDocumentFragment();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const s = document.createElement("span");
+        s.textContent = "៷>ᴗ<៷";
+        frag.appendChild(s);
+      }
+    }
+    bg.innerHTML = "";
+    bg.appendChild(frag);
+  }
+
+  /* ========== 星夜 ========== */
+  function buildStars() {
+    const layer = $("stars");
+    if (layer.childElementCount) return;
+    const n = 180;
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement("div");
+      d.className = "star";
+      const size = (Math.random() * 2.2 + 0.6).toFixed(2);
+      d.style.width = size + "px";
+      d.style.height = size + "px";
+      d.style.left = (Math.random() * 100).toFixed(2) + "%";
+      d.style.top = (Math.random() * 100).toFixed(2) + "%";
+      d.style.opacity = (0.3 + Math.random() * 0.7).toFixed(2);
+      d.style.animation =
+        "twinkle " + (1.4 + Math.random() * 2.6).toFixed(2) + "s ease-in-out " +
+        (Math.random() * 2).toFixed(2) + "s infinite alternate";
+      layer.appendChild(d);
+    }
+  }
+
+  /* ========== 字框 ========== */
+  function makeBox(text, opts) {
+    opts = opts || {};
+    mainBox.innerHTML = "";
+    const el = document.createElement("div");
+    el.className =
+      "box" + (opts.dark ? " dark" : "") + (opts.clickable ? " clickable" : "") + (opts.small ? " small" : "");
+    el.textContent = text;
+    mainBox.appendChild(el);
+    return el;
+  }
+
+  function waitClick(el) {
+    return new Promise((resolve) => {
+      el.addEventListener("click", () => resolve(), { once: true });
+    });
+  }
+
+  function clearChoices() {
+    choicesBox.innerHTML = "";
+  }
+
+  /* ========== 选项 ========== */
+  const OPTIONS = [
+    ["A.满怀爱意的收下它", () => onA()],
+    ["B.疑惑的扣出问号", () => onB()],
+    ["C.对我说早安", () => onC()],
+  ];
+
+  function showChoices() {
+    clearChoices();
+    OPTIONS.forEach(([label, fn], i) => {
+      const b = document.createElement("div");
+      b.className = "box small clickable";
+      b.textContent = label;
+      b.style.animationDelay = (i * 0.08).toFixed(2) + "s";
+      b.addEventListener("click", () => {
+        if (locked) return;
+        locked = true;
+        clearChoices();
+        Promise.resolve(fn()).finally(() => { locked = false; });
+      });
+      choicesBox.appendChild(b);
+    });
+  }
+
+  function backToChoice() {
+    makeBox("请选择你的回答");
+    showChoices();
+  }
+
+  /* ========== 主线 ========== */
+  async function intro() {
+    const lines = ["早安哦", "早起的鸟儿有虫吃", "所以送你个小礼物", "🐛", "哦哦。"];
+    for (const t of lines) {
+      makeBox(t);
+      await sleep(1300);
+    }
+    makeBox("请选择你的回答");   // 这个不消失
+    await sleep(500);
+    showChoices();               // 下面出现较小的字框
+  }
+
+  async function boot() {
+    await sleep(1000);                                 // 一秒后
+    const el = makeBox("你好呀 点我", { clickable: true });
+    await waitClick(el);
+    await intro();
+  }
+
+  /* ========== A：突脸 ========== */
+  async function onA() {
+    document.body.classList.add("blackout");
+
+    const bug = document.createElement("div");
+    bug.className = "bugface";
+    bug.textContent = "🐛";
+    document.body.appendChild(bug);
+
+    await sleep(150);
+    makeBox("它也爱你 所以你失败了", { dark: true });   // 白色字体
+    await sleep(2600);
+
+    bug.remove();
+    document.body.classList.remove("blackout");
+    await sleep(300);
+    backToChoice();
+  }
+
+  /* ========== B：不喜欢 ========== */
+  async function onB() {
+    mainBox.innerHTML = "";            // 字框消失
+    document.body.classList.remove("night");
+    document.body.style.background = "#ffffff";
+    await sleep(250);
+    makeBox("哦。不喜欢就不喜欢");      // 纯白背景 + 黑色字体
+    await sleep(2200);
+    backToChoice();
+  }
+
+  /* ========== C：早安 ========== */
+  async function onC() {
+    mainBox.innerHTML = "";
+    document.body.style.background = "#ffffff";
+    await sleep(250);
+
+    makeBox("早安哦");
+    await sleep(1200);
+
+    makeBox("恭喜你浪费了几秒钟");
+    await sleep(1500);
+
+    const el = makeBox("点击我", { clickable: true });
+    await waitClick(el);
+
+    await starryNight();
+  }
+
+  /* ========== 星夜结局 ========== */
+  async function starryNight() {
+    buildStars();
+    document.body.style.background = "";
+    document.body.classList.add("night");
+    await sleep(700);
+
+    makeBox("你还想看什么。");
+    await sleep(1300);
+
+    makeBox("结束了！");
+    await sleep(1300);
+
+    makeBox("要开心哦");
+    await sleep(5000);                 // 五秒后
+
+    makeBox("你怎么还在看");
+    await sleep(1500);
+
+    makeBox("那好吧");
+    await sleep(1500);
+
+    makeBox("可以许愿");
+    await sleep(1600);
+
+    makeBox("告诉我不告诉我都可以");
+    await sleep(1800);
+
+    makeBox("我也不一定会实现");
+    await sleep(1800);
+
+    makeBox("◉‿◉");
+  }
+
+  /* ========== 启动 ========== */
+  buildBG();
+  window.addEventListener("resize", () => {
+    clearTimeout(window.__bgT);
+    window.__bgT = setTimeout(buildBG, 220);
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>
